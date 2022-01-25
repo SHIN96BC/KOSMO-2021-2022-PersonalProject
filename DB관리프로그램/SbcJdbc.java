@@ -72,7 +72,8 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 	}
 	void setDataEarly(String tname) {
 		String pKeyCloumn = primarykeySearch(tname);
-		String sql = "select * from "+ tname + " order by "+pKeyCloumn;
+		String sql = "select * from "+ tname;
+		if(pKeyCloumn.length()!=0) sql = "select * from "+ tname + " order by "+pKeyCloumn;
 		ResultSet rs = null;
 		ResultSetMetaData rsmd = null;
 		try {
@@ -304,45 +305,65 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 	// 인서트 할때 into(컬럼이름) 해서 입력한 컬럼만 인서트 되게 할지 고민중...
 	// DATE 타입에선 SYSDATE 랑 년도, 월, 일, 입력했을때랑 시간까지 입력했을때 차이가 있어서 if문으로 나눠줘야겠다.
 	void insertSql(String tname) {   // valchar 타입은 '' 을 적어줘야되서 sql 에러가 발생함. 그렇다면 타입검사를 모두 해줄 필요가 있을 것 같다.
-		String sql = "insert into "+tname+" values(";
-		try {
-			for(int i=0; i<columnName.size(); i++) {
-				String colName = columnName.get(i);
-				int colType = columnType.get(i);
-				for(int j=0; j<columnName.size(); j++) {
-					String colJtName = jt.getColumnName(j);
-					if(colName == colJtName) {
-						if(colType == Types.CHAR || colType == Types.VARCHAR || colType == Types.NVARCHAR) {
-							JTextField jtext = (JTextField)jTextPanel.getComponent(j); // 패널 
-							String str = jtext.getText();
-							str = str.strip();
-							str = "'"+str+"'";
-							sql += str;
-							if(columnName.size()-1>i) sql += ", ";
-							break;
-						}else if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
-							JTextField jtext = (JTextField)jTextPanel.getComponent(j); // 패널 
-							String str = jtext.getText();
-							str = str.strip();
-							if(str.equalsIgnoreCase("SYSDATE")) {
-								sql += str;
-							}else {
-								str = "TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
-								sql += str;
-							}
-							if(columnName.size()-1>i) sql += ", ";
-							break;
-						}else {
-							JTextField jtext = (JTextField)jTextPanel.getComponent(j); // 패널 
-							String str = jtext.getText();
-							sql += str;
-							if(columnName.size()-1>i) sql += ", ";
-							break;
+		String pKeyColumn = primarykeySearch(tname);
+		String sql = "insert into "+tname+"(";
+		String sqlVal = " values(";
+		boolean flag = false;
+		
+		for(int i=0; i<columnName.size(); i++) {
+			String colName = columnName.get(i);
+			int colType = columnType.get(i);
+			for(int j=0; j<columnName.size(); j++) {
+				String colJtName = jt.getColumnName(j);
+				if(colName.equalsIgnoreCase(colJtName)) {
+					JTextField jtext = (JTextField)jTextPanel.getComponent(j); // 패널 
+					String str = jtext.getText();
+					str = str.strip();
+					if(str.length() == 0 && pKeyColumn.equalsIgnoreCase(colJtName)) {
+						JOptionPane.showMessageDialog(null, "키본키는 반드시 입력해야합니다.", "SQL에러!", JOptionPane.WARNING_MESSAGE);
+						return;
+					}
+					if(str.length() == 0) break;
+					if(colType == Types.CHAR || colType == Types.VARCHAR || colType == Types.NVARCHAR) {
+						if(flag == true) {
+							sql += ", ";
+							sqlVal += ", ";
 						}
+						sql += colJtName;
+						sqlVal += "'"+str+"'";
+						flag = true;
+						break;
+					}else if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
+						if(flag == true) {
+							sql += ", ";
+							sqlVal += ", ";
+						}
+						if(str.equalsIgnoreCase("SYSDATE")) {
+							sql += colJtName;
+							sqlVal += str;
+						}else {
+							sql += colJtName;
+							sqlVal += "TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
+						}
+						flag = true;
+						break;
+					}else {
+						if(flag == true) {
+							sql += ", ";
+							sqlVal += ", ";
+						}
+						sql += colJtName;
+						sqlVal += str;
+						flag = true;
+						break;
 					}
 				}
 			}
-			sql += ")";
+		}
+		sql += ")";
+		sqlVal += ")";
+		sql += sqlVal;
+		try {
 			int i = stmt.executeUpdate(sql);
 			if(i>0) sjl.pln("입력성공");
 			else sjl.pln("입력실패");
@@ -352,10 +373,50 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 	}
 // 기본키로만 삭제할지, 어떤 컬럼이든 삭제 가능하게할지 고민중... (어떤 컬럼이든 가능하게하면 여러개 동시 삭제 가능)
 	void deleteSql(String tname) {
-		String pKeyCloumn = primarykeySearch(tname);
-		String sql = "delete from "+tname+" where "+pKeyCloumn+"=";
-		int colType = 0;
-		String str = "";
+		//String pKeyCloumn = primarykeySearch(tname);
+		//String sql = "delete from "+tname+" where "+pKeyCloumn+"=";
+		String sql = "delete from "+tname+" where ";
+		boolean flag = false;
+		
+		for(int i=0; i<columnName.size(); i++) {
+			String colName = columnName.get(i);
+			int colType = columnType.get(i);
+			for(int j=0; j<columnName.size(); j++) {
+				String colJtName = jt.getColumnName(j);
+				if(colName.equalsIgnoreCase(colJtName)) {
+					JTextField jtext = (JTextField)jTextPanel.getComponent(j);
+					String str = jtext.getText();
+					str = str.strip();
+					if(str.length() == 0) break;
+					if(colType == Types.CHAR || colType == Types.VARCHAR || colType == Types.NVARCHAR ) {
+						if(flag == true) sql += " or ";
+						sql += colJtName+" = '"+str+"'";
+						flag = true;
+						break;
+					}else if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
+						if(flag == true) sql += " or ";
+						if(str.equalsIgnoreCase("SYSDATE")) sql += str;
+						else sql += colJtName+" = TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
+						flag = true;
+						break;
+					}else {
+						if(flag == true) sql += " or ";
+						sql += colJtName+" = "+str;
+						flag = true;
+						break;
+					}
+				}
+			}
+		}
+		try {
+			int i = stmt.executeUpdate(sql);
+			if(i>0) sjl.pln("삭제 성공");
+			else sjl.pln("삭제 실패");
+		}catch(SQLException se) {
+			sjl.pln("삭제 실패: " + se);
+		}
+/*	
+ 기본키로 하나씩만 지울때 썼던 로직
 		for(int i=0; i<columnName.size(); i++) {
 			if(pKeyCloumn.equalsIgnoreCase(columnName.get(i))) {
 				colType = columnType.get(i);
@@ -376,18 +437,21 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 		}
 		sql += str;
 		try {
+			sjl.pln("sql: " + sql);
 			int i = stmt.executeUpdate(sql);
 			if(i>0) sjl.pln("삭제 성공");
 			else sjl.pln("삭제 실패");
 		}catch(SQLException se) {
 			sjl.pln("삭제 실패: " + se);
 		}
+		*/
 	}
 	void updateSql(String tname) {
 		String pKeyColumn = primarykeySearch(tname);
 		String sql = "update "+tname+" set ";
-		String pKeySql = "";
+		String sqlWhere = "";
 		boolean flag = false;
+		
 		for(int i=0; i<columnName.size(); i++) {
 			String colName = columnName.get(i);
 			int colType = columnType.get(i);
@@ -398,57 +462,48 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 						JTextField jtext = (JTextField)jTextPanel.getComponent(j);
 						String str = jtext.getText();
 						str = str.strip();
-						if(str.length() == 0 || str.equals(" ")) break;
+						if(str.length() == 0) {
+							JOptionPane.showMessageDialog(null, "키본키는 반드시 입력해야합니다.", "SQL에러!", JOptionPane.WARNING_MESSAGE);
+							return;
+						}
 						if(colType == Types.CHAR || colType == Types.VARCHAR || colType == Types.NVARCHAR) {
-							pKeySql = "where "+colName+" = '"+str+"'";
+							sqlWhere = " where "+colJtName+" = '"+str+"'";
 							break;
 						}else if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
-							if(str.equalsIgnoreCase("SYSDATE")) {
-								pKeySql = "where "+colName+" = "+str;
-								break;
-							}else {
-								str = "TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
-								pKeySql = "where "+colName+" = "+str;
-								break;
-							}
-						}else {
-							pKeySql = "where "+colName+" = "+str;
-							break;
-						}
-					}
-					JTextField jtext = (JTextField)jTextPanel.getComponent(j);
-					String str = jtext.getText();
-					str = str.strip();
-					if(str.length() == 0 || str.equals(" ")) break;
-
-					if(colType == Types.CHAR || colType == Types.VARCHAR || colType == Types.NVARCHAR) {
-						if(flag == true) sql += ", "; 
-						sql += colName+" = '"+str+"'";
-						flag = true;
-						break;
-					}else if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
-						if(str.equalsIgnoreCase("SYSDATE")) {
-							if(flag == true) sql += ", ";
-							sql += colName+" = "+str;
-							flag = true;
+							if(str.equalsIgnoreCase("SYSDATE"))sqlWhere = "where "+colJtName+" = "+str;
+							else sqlWhere = " where "+colJtName+" = "+"TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
 							break;
 						}else {
-							if(flag == true) sql += ", ";
-							str = "TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
-							sql += colName+" = "+str;
-							flag = true;
+							sqlWhere = " where "+colJtName+" = "+str;
 							break;
 						}
 					}else {
-						if(flag == true) sql += ", ";
-						sql += colName+" = "+str;
-						flag = true;
-						break;
+						JTextField jtext = (JTextField)jTextPanel.getComponent(j);
+						String str = jtext.getText();
+						str = str.strip();
+						if(str.length() == 0) break;
+						if(colType == Types.CHAR || colType == Types.VARCHAR || colType == Types.NVARCHAR) {
+							if(flag == true) sql += ", ";
+							sql += colJtName+" = '"+str+"'";
+							flag = true;
+							break;
+						}else if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
+							if(flag == true) sql += ", ";
+							if(str.equalsIgnoreCase("SYSDATE"))sql += colJtName+" = "+str;
+							else sql += colJtName+" = "+"TO_DATE('"+str+"', 'YYYY-MM-DD HH24:MI:SS')";
+							flag = true;
+							break;
+						}else {
+							if(flag == true) sql += ", ";
+							sql += colJtName+" = "+str;
+							flag = true;
+							break;
+						}
 					}
 				}
 			}
 		}
-		sql += " "+pKeySql;
+		sql += sqlWhere;
 		try {
 			int i = stmt.executeUpdate(sql);
 			if(i>0) sjl.pln("수정 성공");
@@ -482,7 +537,11 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 			setDataEarly(tname);
 			dtm.setDataVector(rowData, columnName);
 			setTextField();
-			columnCombo.setSelectedIndex(0);
+			try {
+				columnCombo.setSelectedIndex(0);
+			}catch(IndexOutOfBoundsException iobe) {
+				JOptionPane.showMessageDialog(null, "테이블에 아무것도 존재하지 않습니다.", "테이블에러!", JOptionPane.WARNING_MESSAGE);
+			}
 		}else if(event == insertB) {
 			String tname = (String)tableCombo.getSelectedItem();
 			insertSql(tname);
@@ -500,20 +559,20 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 			setTextField();
 		}
 	}
-	@Override
-	public void mouseClicked(MouseEvent e) {
-		Object event = e.getSource();
-		if(event == jt) {
-			JTableEvent();
-		}
-	}
 //마우스 리스너
+	@Override
+	public void mouseClicked(MouseEvent e) {}
 	@Override
 	public void mouseEntered(MouseEvent e) {}
 	@Override
 	public void mouseExited(MouseEvent e) {}
 	@Override
-	public void mousePressed(MouseEvent e) {}
+	public void mousePressed(MouseEvent e) {
+		Object event = e.getSource();
+		if(event == jt) {
+			JTableEvent();
+		}
+	}
 	@Override
 	public void mouseReleased(MouseEvent e) {}
 //윈도우 리스너
