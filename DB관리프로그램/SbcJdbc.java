@@ -244,7 +244,15 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 
 // DATE 타입은 따로 나눠줘야한다.
 	void selectSql(String tname, String colname, String like) { 
-		String sql = "select * from "+tname+" where "+colname+" like '%"+like+"%'";
+		String sql = "select * from "+tname+" where LOWER("+colname+") like LOWER('%"+like+"%') order by "+colname;
+		for(int i=0; i<columnName.size(); i++) {
+			if(colname.equalsIgnoreCase(columnName.get(i))) {
+				int colType = columnType.get(i);
+				if(colType == Types.DATE || colType ==Types.TIME|| colType ==Types.TIMESTAMP) {
+					sql = "select * from "+tname+" where to_char("+colname+", 'YYYY/MM/DD HH24:MI:SS') like '%"+like+"%' order by "+colname;
+				}
+			}
+		}
 		ResultSet rs=null;
 		try{
 			stmt = con.createStatement();
@@ -260,9 +268,10 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 				rowData.add(v);
 			}
 		}catch(SQLException se){
+			sjl.pln("se: " + se);
 		}finally {
 			try {
-				rs.close();
+				if(rs != null) rs.close();
 			}catch(SQLException se){
 			}
 		}
@@ -372,6 +381,10 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 					}
 				}
 			}
+		}
+		if(flag == false) {
+			JOptionPane.showMessageDialog(null, "최소한 하나의 값은 입력해야합니다.", "SQL에러!", JOptionPane.WARNING_MESSAGE);
+			return;
 		}
 		try {
 			int i = stmt.executeUpdate(sql);
