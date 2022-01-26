@@ -6,12 +6,17 @@ import javax.swing.plaf.PanelUI;
 import javax.swing.table.DefaultTableModel;
 import java.awt.Container;
 import java.awt.GridLayout;
+import java.awt.BorderLayout;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowListener;
 import java.awt.event.WindowEvent;
+import java.awt.event.KeyListener;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -23,12 +28,12 @@ import java.util.Vector;
 import java.util.HashMap;
 import java.util.Set;
 
-public class SbcJdbc extends JFrame implements MouseListener, ActionListener, WindowListener{
+public class SbcJdbc extends JFrame implements MouseListener, ActionListener, WindowListener, KeyListener{
 	Container cp;
 	JTable jt;
 	DefaultTableModel dtm;
 	JScrollPane jp;
-	JPanel jTablePanel, jMenuPanel, jMainPanel, jTextPanel, jMenuTextPanel, jLablePanel;
+	JPanel jTablePanel, jMenuPanel, jTextPanel, jMenuTextPanel, jLablePanel, jMainPanel, jButtonPanel;
 	JComboBox tableCombo, columnCombo;
 	JTextField searchText;
 	JButton insertB, updateB, deleteB;
@@ -118,19 +123,20 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 		tableCombo.addActionListener(this);
 		columnCombo = new JComboBox(columnName);
 		searchText = new JTextField();
+		searchText.addKeyListener(this);
 		insertB = new JButton("추가");
 		insertB.addActionListener(this);
 		updateB = new JButton("수정");
 		updateB.addActionListener(this);
 		deleteB = new JButton("삭제");
 		deleteB.addActionListener(this);
-		jTableLabel = new JLabel("테이블 변경");
-		jColumnLabel = new JLabel("컬럼 변경");
-		jSearchLabel = new JLabel("검색");
+		jTableLabel = new JLabel("                                                                  테이블 변경");
+		jColumnLabel = new JLabel("                                                                     컬럼 변경");
+		jSearchLabel = new JLabel("                                                                        검색");
 
 		jTablePanel = new JPanel(new GridLayout(1,1));
 		jTablePanel.add(jp);
-		jMenuPanel = new JPanel(new GridLayout(2,3));
+		
 		jTextPanel = new JPanel();
 		jTextPanel.setLayout(new GridLayout(1, columnName.size()));
 		setTextField();
@@ -139,15 +145,21 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 		jLablePanel.add(jColumnLabel);
 		jLablePanel.add(jSearchLabel);
 		
+		jMenuPanel = new JPanel(new GridLayout(1,3));
 		jMenuPanel.add(tableCombo);
 		jMenuPanel.add(columnCombo);
 		jMenuPanel.add(searchText);
-		jMenuPanel.add(insertB);
-		jMenuPanel.add(updateB);
-		jMenuPanel.add(deleteB);
-		jMenuTextPanel = new JPanel(new GridLayout(2,1));
+		
+		jButtonPanel = new JPanel(new GridLayout(1,3));
+		jButtonPanel.add(insertB);
+		jButtonPanel.add(updateB);
+		jButtonPanel.add(deleteB);
+		
+		jMenuTextPanel = new JPanel(new GridLayout(4,1));
 		jMenuTextPanel.add(jTextPanel);
+		jMenuTextPanel.add(jLablePanel);
 		jMenuTextPanel.add(jMenuPanel);
+		jMenuTextPanel.add(jButtonPanel);
 		
 		jMainPanel =new JPanel(new GridLayout(2,1));
 		jMainPanel.add(jTablePanel);
@@ -229,78 +241,31 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 		}
 		
 	}
-	
-/*텍스트필드 셋팅 해쉬맵사용
-	void setTextField() {
-		jTextPanel.removeAll();
-		for(int i=0; i<jtextNum.size(); i++) {
-			for(String key: jtextNum.keySet()) {   // 패널에 updateUI() 써서 실시간 UI 업데이트가 된다	
-				String columnName = jt.getColumnName(i);
-				if(columnName.equalsIgnoreCase(key)) {
-					jTextPanel.add(jtextNum.get(key));    
+
+// DATE 타입은 따로 나눠줘야한다.
+	void selectSql(String tname, String colname, String like) { 
+		String sql = "select * from "+tname+" where "+colname+" like '%"+like+"%'";
+		ResultSet rs=null;
+		try{
+			stmt = con.createStatement();
+			rs = stmt.executeQuery(sql);
+			ResultSetMetaData rsmd = rs.getMetaData();
+			int index = rsmd.getColumnCount();
+			rowData.clear();
+			while(rs.next()){
+				Vector<String> v = new Vector<String>();
+				for(int j=1; j<=index; j++){
+					v.add(rs.getString(j));
 				}
+				rowData.add(v);
+			}
+		}catch(SQLException se){
+		}finally {
+			try {
+				rs.close();
+			}catch(SQLException se){
 			}
 		}
-		jTextPanel.updateUI();
-	}
-	void JTableEvent() {  // 같은 키값으로 다른벨류값을 넣으면 업데이틑 될까?
-		jTextPanel.removeAll();
-		String pKeyCloumn = primarykeySearch();
-		int row = jt.getSelectedRow();            // getColumnName(int);
-		for(int i=0; i<jtextNum.size(); i++) {
-			for(String key: jtextNum.keySet()) {   // 패널에 updateUI() 써서 실시간 UI 업데이트가 된다	
-				String val = (String)jt.getValueAt(row, i);
-				String columnName = jt.getColumnName(i);
-				if(columnName.equalsIgnoreCase(key)) {
-					if(pKeyCloumn.equalsIgnoreCase(key)){
-						JTextField jtext = jtextNum.get(key);
-						jtext.setEditable(false);
-						jtext.setText(val);
-						jTextPanel.add(jtext);   
-						continue;
-					}
-					JTextField jtext = jtextNum.get(key);
-					jtext.setText(val);
-					jTextPanel.add(jtext);
-				}
-			}
-		}
-		jTextPanel.updateUI();
-	}
-*/
-	
-/* 텍스트필드 셋팅 백터사용  (setEditable(false)가 안풀리는 버그 있음 )
-	void setTextField() {        
-		jTextPanel.removeAll();
-		for(int i=0; i<jtextNum1.size(); i++) {   // 패널에 updateUI() 써서 실시간 UI 업데이트가 된다
-			jTextPanel.add(jtextNum1.get(i));
-		}
-		jTextPanel.updateUI();
-	}
-	void JTableEvent() {        
-		jTextPanel.removeAll();
-		String pKeyCloumn = primarykeySearch();
-		int row = jt.getSelectedRow();            // getColumnName(int);
-		for(int i=0; i<jtextNum1.size(); i++) {   // 패널에 updateUI() 써서 실시간 UI 업데이트가 된다
-			String val = (String)jt.getValueAt(row, i);
-			String columnName = jt.getColumnName(i);
-			
-			if(pKeyCloumn.equalsIgnoreCase(columnName)){
-				JTextField jtext = jtextNum1.get(i);
-				jtext.setEditable(false);
-				jtext.setText(val);
-				jTextPanel.add(jtext);
-				continue;
-			}
-			JTextField jtext = jtextNum1.get(i);
-			jtext.setText(val);
-			jTextPanel.add(jtext);
-		}
-		jTextPanel.updateUI();
-	}
-*/
-	void columnSelect() { 
-		
 	}
 	// 인서트 할때 into(컬럼이름) 해서 입력한 컬럼만 인서트 되게 할지 고민중...
 	// DATE 타입에선 SYSDATE 랑 년도, 월, 일, 입력했을때랑 시간까지 입력했을때 차이가 있어서 if문으로 나눠줘야겠다.
@@ -448,6 +413,7 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 	}
 	void updateSql(String tname) {
 		String pKeyColumn = primarykeySearch(tname);
+		if(pKeyColumn.length()==0) pKeyColumn = columnName.get(0);
 		String sql = "update "+tname+" set ";
 		String sqlWhere = "";
 		boolean flag = false;
@@ -575,6 +541,26 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 	}
 	@Override
 	public void mouseReleased(MouseEvent e) {}
+//키 리스너
+	@Override
+	public void keyPressed(KeyEvent e){}
+	@Override
+	public void keyReleased(KeyEvent e){
+		String like = searchText.getText();
+		String tname = (String)tableCombo.getSelectedItem();
+		String colname = (String)columnCombo.getSelectedItem();
+		setTextField();
+		if(like.length() == 0){
+			setDataEarly(tname);
+			dtm.setDataVector(rowData,columnName);
+		}else{
+			selectSql(tname, colname, like);
+			dtm.setDataVector(rowData,columnName);
+		}
+	}
+	@Override
+	public void keyTyped(KeyEvent e){}
+	
 //윈도우 리스너
 	@Override
 	public void windowActivated(WindowEvent e) {}
@@ -591,6 +577,7 @@ public class SbcJdbc extends JFrame implements MouseListener, ActionListener, Wi
 				System.exit(0);
 			}
 			System.exit(0);
+			setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		}
 	}
 	@Override
